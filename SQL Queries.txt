@@ -1,0 +1,341 @@
+-- Ad-Hoc Requests
+
+-- 1. Provide a list of products with a base price greater than 500 and that are featured in promo type of ‘BOGOF’
+
+
+SELECT 
+	DISTINCT p.product_name, f.base_price
+FROM
+	dim_products p 
+JOIN
+	fact_events f ON p.product_code=f.product_code
+WHERE
+	base_price > 500 and promo_type = "BOGOF"
+;
+    
+
+-- 2. Generate a report that provides an overview of the number of stores in each city.
+
+
+SELECT 
+	City, 
+    COUNT(store_id) AS Store_Count 
+FROM 
+	dim_stores
+GROUP BY 
+	City
+ORDER BY
+	Store_Count DESC
+;
+
+SQL Query to create VIEW: 
+
+CREATE VIEW Revenue_Data AS
+SELECT
+	*,
+    base_price * quantity_sold_before_promo AS Revenue_Before,
+    (CASE
+		WHEN promo_type = '50% OFF' THEN base_price * 0.5 * quantity_sold_after_promo
+        WHEN promo_type = '25% OFF' THEN base_price * 0.75 * quantity_sold_after_promo
+        WHEN promo_type = 'BOGOF' THEN base_price * 0.5 * 2 * quantity_sold_after_promo
+        WHEN promo_type = '500 Cashback' THEN (base_price - 500) * quantity_sold_after_promo
+        WHEN promo_type = '33% OFF' THEN base_price * 0.67  * quantity_sold_after_promo
+	END) AS Revenue_After,
+    IF(promo_type='BOGOF',2*quantity_sold_after_promo, quantity_sold_after_promo) AS         Quantities_Sold_After_Promo
+FROM
+	fact_events
+JOIN 
+	dim_campaigns USING(campaign_id)
+JOIN
+	dim_products USING (product_code)
+JOIN
+	dim_stores USING (store_id)
+;
+
+-- 3. Generate a report that displays each campaign along with the total revenue generated before and after the campaign.
+
+
+SELECT
+	campaign_name, 
+    CONCAT(ROUND(SUM(Revenue_Before)/1000000,2), "M") AS Total_Revenue_Before_Promotion,
+    CONCAT(ROUND(SUM(Revenue_After)/1000000,2), "M") AS Total_Revenue_After_Promotion
+FROM
+	revenue_data
+GROUP BY
+	campaign_name
+;
+
+
+-- 4. Produce a report that calculates the Incremental Sold Quantity(ISU%) for each category during the Diwali campaign. 
+
+
+WITH CTE AS
+(SELECT
+	category,
+    ROUND((SUM(Quantities_Sold_After_Promo) - SUM(quantity_sold_before_promo))/SUM(quantity_sold_before_promo)*100,2) AS ISU_PCT
+FROM
+	revenue_data
+WHERE
+	campaign_name = "Diwali"
+GROUP BY
+	category
+ORDER BY 
+	ISU_PCT DESC)
+
+SELECT
+    category, 
+    ISU_PCT, 
+	RANK() OVER(ORDER BY ISU_PCT DESC) AS ISU_PCT
+FROM 
+CTE
+;
+
+
+-- 5. Create a report featuring the top 5 products, ranked by Incremental Revenue Percentage(IR%), across all the campaigns.
+
+
+SELECT
+	product_name,
+    ROUND((SUM(Revenue_After)-SUM(Revenue_Before))/SUM(Revenue_Before)*100,2) AS IR_PCT
+FROM
+	revenue_data
+GROUP BY 
+	product_name
+ORDER BY 
+	IR_PCT DESC
+LIMIT 5
+;
+
+
+-- Store Performance Analysis
+
+
+-- 1. Which are the top 10 stores in terms of Incremental Revenue(IR) generated from the promotions
+
+
+SELECT
+	store_id,
+	CONCAT(ROUND((SUM(Revenue_After) - SUM(Revenue_Before))/1000000,2), "M") AS IR 
+FROM
+	revenue_data
+GROUP BY 
+	store_id
+ORDER BY
+	IR DESC
+LIMIT 10
+;
+
+
+-- 2. Which are the bottom 10 stores when it comes to Incremental Sold Units(ISU)
+
+
+SELECT
+	city,
+    store_id,
+    (SUM(Quantities_Sold_After_Promo) - SUM(quantity_sold_before_promo)) AS ISU
+FROM
+	revenue_data
+GROUP BY
+	store_id
+ORDER BY
+	ISU ASC
+LIMIT 10
+;
+
+
+-- 3. How does performance of stores vary by city?
+    
+
+SELECT
+	store_id,
+    city,
+    CONCAT(ROUND((SUM(Revenue_After)-SUM(Revenue_Before))/1000000,2), "M") AS IR
+FROM 
+	revenue_data
+GROUP BY
+	store_id
+ORDER BY
+	IR DESC
+;
+
+
+-- Promotion analysis
+
+-- 1. What are the top 2 promotion types that resulted in the highest Incremental revenue
+
+
+SELECT
+	promo_type,
+    CONCAT(ROUND((SUM(Revenue_After)-SUM(Revenue_Before))/1000000,2), "M") AS IR
+FROM 
+	revenue_data
+GROUP BY
+	promo_type
+ORDER BY
+	IR DESC
+LIMIT 2
+;
+
+
+-- 2. What are the bottom 2 promotion types in terms of their impact on Incremental Sold Units
+
+
+SELECT
+	promo_type,
+    (SUM(Quantities_Sold_After_Promo) - SUM(quantity_sold_before_promo)) AS ISU
+FROM
+	revenue_data
+GROUP BY
+	promo_type
+ORDER BY
+	ISU ASC
+LIMIT 2
+;
+
+-- 3. Which promotions strike the best balance between Incremental Sold Units and maintaining healthy margins.
+
+
+SELECT
+	promo_type,
+    CONCAT(ROUND((SUM(Revenue_After)-SUM(Revenue_Before))/1000000,2), "M") AS IR,
+    (SUM(Quantities_Sold_After_Promo) - SUM(quantity_sold_before_promo)) AS ISU
+FROM 
+	revenue_data
+GROUP BY
+	promo_type
+ORDER BY
+	IR DESC
+;
+    
+
+-- Product and Category analysis
+
+-- 1. Which product categories saw the most significant lift in sales from the promotions
+ 
+
+SELECT
+	category,
+    (SUM(Quantities_Sold_After_Promo) - SUM(quantity_sold_before_promo)) AS ISU
+FROM
+	revenue_data
+GROUP BY
+	category
+ORDER BY
+	ISU DESC
+;
+
+-- 2. Are there specific products that respond exceptionally well and or poorly to promotions
+ 
+
+
+WITH CTE AS
+(SELECT
+	product_name,
+    CONCAT(ROUND((SUM(Revenue_After)-SUM(Revenue_Before))/1000000,2), "M") AS IR,
+    ROW_NUMBER() OVER(ORDER BY SUM(Revenue_After)-SUM(Revenue_Before) DESC) AS Top_Rank,
+    ROW_NUMBER() OVER(ORDER BY SUM(Revenue_After)-SUM(Revenue_Before) ASC) AS Bottom_Rank
+FROM
+	revenue_data
+GROUP BY
+	product_name)
+SELECT
+	product_name,
+    IR
+FROM
+	CTE
+WHERE
+	Top_Rank<=3 OR Bottom_Rank<=3
+ORDER BY
+	IR DESC
+;
+
+
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+    
+
+    
+
+
+
+	
+
+
+		
+
+
+
+
+
+		
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
