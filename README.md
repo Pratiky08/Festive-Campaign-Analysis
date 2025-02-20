@@ -41,7 +41,6 @@ These insights will help AtliQ Mart make data-driven decisions for future promot
 - **Top 2 Promotion Types by Incremental Revenue:** Determine the promotion types that resulted in the highest incremental revenue.  
 - **Bottom 2 Promotion Types by Incremental Sold Units:** Identify the least effective promotion types in terms of their impact on incremental sold units.  
 - **Comparison of Promotion Types:** Analyze performance differences between discount-based promotions, BOGOF (Buy One Get One Free), and cashback promotions.  
-- **Optimal Promotion Type:** Determine which promotion types strike the best balance between incremental sold units and maintaining healthy margins.
 
 ## Product and Category Analysis
 - **High-Lifting Product Categories:** Identify product categories that experienced significant sales growth due to promotions.  
