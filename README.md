@@ -13,8 +13,11 @@ This analysis leverages data from AtliQ Mart's internal databases, primarily usi
 ## Project Overview
 
 1.Analyzed data from AtliQ Mart’s internal databases.
+
 2.Executed SQL queries to address five key ad-hoc requests.
+
 3.The insights aim to guide future promotional strategies and resource allocation.
+
 4.Customized a self explainatory dynamic Power BI Dashboard
 
 ## Results and Insights
